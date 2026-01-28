@@ -1,0 +1,47 @@
+name: Deploy Wiki
+on:
+  push:
+    branches:
+      - main
+  repository_dispatch:
+    types: [ locked-folder-update ]
+
+permissions:
+  contents: write
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/create-github-app-token@v2
+        id: tudo-seal-workflow-token
+        with:
+          app-id: ${{ secrets.TUDO_SEAL_WORKFLOW_CLIENT_ID }}
+          private-key: ${{ secrets.TUDO_SEAL_WORKFLOW_PRIVATE_KEY }}
+          repositories: |
+            pg-680-wiki-private
+            pg-680-wiki
+      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          repository: tudo-seal/pg-680-wiki-private
+          token: ${{ steps.tudo-seal-workflow-token.outputs.token }}
+          path: 'locked'
+      - name: Configure Git Credentials
+        run: |
+          git config user.name "tudo-seal-workflows[bot]"
+          git config user.email "244727884+tudo-seal-workflows[bot]@users.noreply.github.com"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: 3.x
+      - run: echo "cache_id=$(date --utc '+%V')" >> $GITHUB_ENV
+      - uses: actions/cache@v4
+        with:
+          key: mkdocs-material-${{ env.cache_id }}
+          path: ~/.cache
+          restore-keys: |
+            mkdocs-material-
+      - run: pip install mkdocs mkdocs-material mkdocs-minify-plugin mkdocs-literate-nav mkdocs-git-revision-date-localized-plugin mkdocs-gen-files mkdocs-encryptcontent-plugin mkdocs-bibtex pypandoc_binary pygments
+      - run: mkdocs gh-deploy --force
+        env:
+          SUPERVISOR_PASSWORD: ${{ secrets.SUPERVISOR_PASSWORD }}
